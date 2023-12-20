@@ -148,7 +148,7 @@ class StableDiffusionProcessing:
         self.scale_by: float = scale_by
         self.image_cfg_scale = image_cfg_scale
         self.diffusers_guidance_rescale = diffusers_guidance_rescale
-        if devices.backend == "ipex" and width == 1024 and height == 1024:
+        if devices.backend == "ipex" and width == 1024 and height == 1024 and os.environ.get('DISABLE_IPEX_1024_WA', None) is None:
             width = 1080
             height = 1080
         self.width: int = width
@@ -231,6 +231,11 @@ class StableDiffusionProcessing:
         self.hdr_maximize = hdr_maximize
         self.hdr_max_center = hdr_max_center
         self.hdr_max_boundry = hdr_max_boundry
+        self.scheduled_prompt: bool = False
+        self.prompt_embeds = []
+        self.positive_pooleds = []
+        self.negative_embeds = []
+        self.negative_pooleds = []
 
 
     @property
@@ -374,8 +379,8 @@ class Processed:
         self.subseed_strength = p.subseed_strength
         self.info = info
         self.comments = comments
-        self.width = p.width
-        self.height = p.height
+        self.width = p.width if hasattr(p, 'width') else (self.images[0].width if len(self.images) > 0 else 0)
+        self.height = p.height if hasattr(p, 'height') else (self.images[0].height if len(self.images) > 0 else 0)
         self.sampler_name = p.sampler_name
         self.cfg_scale = p.cfg_scale
         self.image_cfg_scale = p.image_cfg_scale
@@ -584,7 +589,7 @@ def create_infotext(p: StableDiffusionProcessing, all_prompts=None, all_seeds=No
         "Seed": all_seeds[index],
         "Sampler": p.sampler_name,
         "CFG scale": p.cfg_scale,
-        "Size": f"{p.width}x{p.height}",
+        "Size": f"{p.width}x{p.height}" if hasattr(p, 'width') and hasattr(p, 'height') else None,
         "Batch": f'{p.n_iter}x{p.batch_size}' if p.n_iter > 1 or p.batch_size > 1 else None,
         "Index": f'{p.iteration + 1}x{index + 1}' if (p.n_iter > 1 or p.batch_size > 1) and index >= 0 else None,
         "Parser": shared.opts.prompt_attention,
@@ -636,6 +641,8 @@ def create_infotext(p: StableDiffusionProcessing, all_prompts=None, all_seeds=No
         args['Resize scale'] = getattr(p, 'scale_by', None)
         args["Mask blur"] = p.mask_blur if getattr(p, 'mask', None) is not None and getattr(p, 'mask_blur', 0) > 0 else None
         args["Denoising strength"] = getattr(p, 'denoising_strength', None)
+        if args["Size"] is None:
+            args["Size"] = args["Init image size"]
         # lookup by index
         if getattr(p, 'resize_mode', None) is not None:
             args['Resize mode'] = shared.resize_modes[p.resize_mode]
@@ -690,6 +697,8 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
         p.scripts.before_process(p)
     stored_opts = {}
     for k, v in p.override_settings.copy().items():
+        if shared.opts.data.get(k, None) is None and shared.opts.data_labels.get(k, None) is None:
+            continue
         orig = shared.opts.data.get(k, None) or shared.opts.data_labels[k].default
         if orig == v or (type(orig) == str and os.path.splitext(orig)[0] == v):
             p.override_settings.pop(k, None)
@@ -1028,7 +1037,7 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
     def __init__(self, enable_hr: bool = False, denoising_strength: float = 0.75, firstphase_width: int = 0, firstphase_height: int = 0, hr_scale: float = 2.0, hr_force: bool = False, hr_upscaler: str = None, hr_second_pass_steps: int = 0, hr_resize_x: int = 0, hr_resize_y: int = 0, refiner_steps: int = 5, refiner_start: float = 0, refiner_prompt: str = '', refiner_negative: str = '', **kwargs):
 
         super().__init__(**kwargs)
-        if devices.backend == "ipex":
+        if devices.backend == "ipex" and os.environ.get('DISABLE_IPEX_1024_WA', None) is None:
             width_curse = bool(hr_resize_x == 1024 and self.height * (hr_resize_x / self.width) == 1024)
             height_curse = bool(hr_resize_y == 1024 and self.width * (hr_resize_y / self.height) == 1024)
             if (width_curse != height_curse) or (height_curse and width_curse):
@@ -1284,7 +1293,8 @@ class StableDiffusionProcessingImg2Img(StableDiffusionProcessing):
         unprocessed = []
         if getattr(self, 'init_images', None) is None:
             return
-            # raise RuntimeError("No images provided")
+        if not isinstance(self.init_images, list):
+            self.init_images = [self.init_images]
         for img in self.init_images:
             if img is None:
                 shared.log.warning(f"Skipping empty image: images={self.init_images}")
@@ -1295,7 +1305,7 @@ class StableDiffusionProcessingImg2Img(StableDiffusionProcessing):
             if shared.opts.save_init_img:
                 images.save_image(img, path=shared.opts.outdir_init_images, basename=None, forced_filename=self.init_img_hash, suffix="-init-image")
             image = images.flatten(img, shared.opts.img2img_background_color)
-            if crop_region is None and self.resize_mode != 4:
+            if crop_region is None and self.resize_mode != 4 and self.resize_mode > 0:
                 if image.width != self.width or image.height != self.height:
                     image = images.resize_image(self.resize_mode, image, self.width, self.height, self.resize_name)
                 self.width = image.width

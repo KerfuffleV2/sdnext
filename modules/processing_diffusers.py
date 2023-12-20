@@ -93,6 +93,16 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
         if kwargs.get('latents', None) is None:
             return kwargs
         kwargs = correction_callback(p, timestep, kwargs)
+        if p.scheduled_prompt and hasattr(kwargs, 'prompt_embeds') and hasattr(kwargs, 'negative_prompt_embeds'):
+            try:
+                i = (step + 1) % len(p.prompt_embeds)
+                kwargs["prompt_embeds"] = p.prompt_embeds[i][0:1].repeat(1, kwargs["prompt_embeds"].shape[0], 1).view(
+                      kwargs["prompt_embeds"].shape[0], kwargs["prompt_embeds"].shape[1], -1)
+                j = (step + 1) % len(p.negative_embeds)
+                kwargs["negative_prompt_embeds"] = p.negative_embeds[j][0:1].repeat(1, kwargs["negative_prompt_embeds"].shape[0], 1).view(
+                      kwargs["negative_prompt_embeds"].shape[0], kwargs["negative_prompt_embeds"].shape[1], -1)
+            except Exception as e:
+                shared.log.debug(f"Callback: {e}")
         shared.state.current_latent = kwargs['latents']
         if shared.cmd_opts.profile and shared.profiler is not None:
             shared.profiler.step()
@@ -225,10 +235,11 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
         is_img2img_model = bool('Zero123' in shared.sd_model.__class__.__name__)
         if sd_models.get_diffusers_task(model) == sd_models.DiffusersTaskType.TEXT_2_IMAGE and not is_img2img_model:
             p.ops.append('txt2img')
-            task_args = {
-                'height': 8 * math.ceil(p.height / 8),
-                'width': 8 * math.ceil(p.width / 8),
-            }
+            if hasattr(p, 'width') and hasattr(p, 'height'):
+                task_args = {
+                    'width': 8 * math.ceil(p.width / 8),
+                    'height': 8 * math.ceil(p.height / 8),
+                }
         elif (sd_models.get_diffusers_task(model) == sd_models.DiffusersTaskType.IMAGE_2_IMAGE or is_img2img_model) and len(getattr(p, 'init_images' ,[])) > 0:
             p.ops.append('img2img')
             task_args = {
@@ -238,8 +249,8 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
         elif sd_models.get_diffusers_task(model) == sd_models.DiffusersTaskType.INSTRUCT and len(getattr(p, 'init_images' ,[])) > 0:
             p.ops.append('instruct')
             task_args = {
-                'height': 8 * math.ceil(p.height / 8),
-                'width': 8 * math.ceil(p.width / 8),
+                'width': 8 * math.ceil(p.width / 8) if hasattr(p, 'width') else None,
+                'height': 8 * math.ceil(p.height / 8) if hasattr(p, 'height') else None,
                 'image': p.init_images,
                 'strength': p.denoising_strength,
             }
@@ -283,8 +294,8 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
             init_latent = (1 - p.denoising_strength) * init_latent + init_noise
             task_args = {
                 'latents': init_latent.to(model.dtype),
-                'width': p.width,
-                'height': p.height,
+                'width': p.width if hasattr(p, 'width') else None,
+                'height': p.height if hasattr(p, 'height') else None,
             }
         return task_args
 
@@ -297,36 +308,29 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
         possible = signature.parameters.keys()
         generator_device = devices.cpu if shared.opts.diffusers_generator_device == "cpu" else shared.device
         generator = [torch.Generator(generator_device).manual_seed(s) for s in seeds]
-        prompt_embed = None
-        pooled = None
-        negative_embed = None
-        negative_pooled = None
         prompts, negative_prompts, prompts_2, negative_prompts_2 = fix_prompts(prompts, negative_prompts, prompts_2, negative_prompts_2)
         parser = 'Fixed attention'
         if shared.opts.prompt_attention != 'Fixed attention' and 'StableDiffusion' in model.__class__.__name__ and not isinstance(model, OnnxStableDiffusionPipeline):
             try:
-                prompt_embed, pooled, negative_embed, negative_pooled = prompt_parser_diffusers.encode_prompts(model, prompts, negative_prompts, kwargs.pop("clip_skip", None))
+                prompt_parser_diffusers.encode_prompts(model, p, prompts, negative_prompts, kwargs.get("num_inference_steps", 1), 0, kwargs.pop("clip_skip", None))
+                # prompt_embed, pooled, negative_embed, negative_pooled = , , , ,
                 parser = shared.opts.prompt_attention
             except Exception as e:
                 shared.log.error(f'Prompt parser encode: {e}')
                 if os.environ.get('SD_PROMPT_DEBUG', None) is not None:
                     errors.display(e, 'Prompt parser encode')
         if 'prompt' in possible:
-            if hasattr(model, 'text_encoder') and 'prompt_embeds' in possible and prompt_embed is not None:
-                if type(pooled) == list:
-                    pooled = pooled[0]
-                if type(negative_pooled) == list:
-                    negative_pooled = negative_pooled[0]
-                args['prompt_embeds'] = prompt_embed
+            if hasattr(model, 'text_encoder') and 'prompt_embeds' in possible and len(p.prompt_embeds) > 0 and p.prompt_embeds[0] is not None:
+                args['prompt_embeds'] = p.prompt_embeds[0]
                 if 'XL' in model.__class__.__name__:
-                    args['pooled_prompt_embeds'] = pooled
+                    args['pooled_prompt_embeds'] = p.positive_pooleds[0]
             else:
                 args['prompt'] = prompts
         if 'negative_prompt' in possible:
-            if hasattr(model, 'text_encoder') and 'negative_prompt_embeds' in possible and negative_embed is not None:
-                args['negative_prompt_embeds'] = negative_embed
+            if hasattr(model, 'text_encoder') and 'negative_prompt_embeds' in possible and len(p.negative_embeds) > 0 and p.negative_embeds[0] is not None:
+                args['negative_prompt_embeds'] = p.negative_embeds[0]
                 if 'XL' in model.__class__.__name__:
-                    args['negative_pooled_prompt_embeds'] = negative_pooled
+                    args['negative_pooled_prompt_embeds'] = p.negative_pooleds[0]
             else:
                 args['negative_prompt'] = negative_prompts
         if hasattr(model, 'scheduler') and hasattr(model.scheduler, 'noise_sampler_seed') and hasattr(model.scheduler, 'noise_sampler'):
@@ -346,7 +350,10 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
             args['callback'] = diffusers_callback_legacy
         elif 'callback_on_step_end_tensor_inputs' in possible:
             args['callback_on_step_end'] = diffusers_callback
-            args['callback_on_step_end_tensor_inputs'] = ['latents']
+            if 'prompt_embeds' in possible and 'negative_prompt_embeds' in possible:
+                args['callback_on_step_end_tensor_inputs'] = ['latents', 'prompt_embeds', 'negative_prompt_embeds']
+            else:
+                args['callback_on_step_end_tensor_inputs'] = ['latents']
         for arg in kwargs:
             if arg in possible: # add kwargs
                 args[arg] = kwargs[arg]
@@ -409,8 +416,8 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
     def recompile_model(hires=False):
         if shared.opts.cuda_compile and shared.opts.cuda_compile_backend != 'none':
             if shared.opts.cuda_compile_backend == "openvino_fx":
-                compile_height = p.height if not hires else p.hr_upscale_to_y
-                compile_width = p.width if not hires else p.hr_upscale_to_x
+                compile_height = p.height if not hires and hasattr(p, 'height') else p.hr_upscale_to_y
+                compile_width = p.width if not hires and hasattr(p, 'width') else p.hr_upscale_to_x
                 if (shared.compiled_model_state is None or
                 (not shared.compiled_model_state.first_pass
                 and (shared.compiled_model_state.height != compile_height
@@ -510,7 +517,7 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
     if hasattr(shared.sd_model, 'unet') and hasattr(shared.sd_model.unet, 'config') and hasattr(shared.sd_model.unet.config, 'in_channels') and shared.sd_model.unet.config.in_channels == 9:
         shared.sd_model = sd_models.set_diffuser_pipe(shared.sd_model, sd_models.DiffusersTaskType.INPAINTING) # force pipeline
         if len(getattr(p, 'init_images' ,[])) == 0:
-            p.init_images = [TF.to_pil_image(torch.rand((3, p.height, p.width)))]
+            p.init_images = [TF.to_pil_image(torch.rand((3, getattr(p, 'height', 512), getattr(p, 'width', 512))))]
     base_args = set_pipeline_args(
         model=shared.sd_model,
         prompts=prompts,
@@ -531,7 +538,8 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
     update_sampler(shared.sd_model)
     shared.state.sampling_steps = base_args['num_inference_steps']
     p.extra_generation_params['Pipeline'] = shared.sd_model.__class__.__name__
-    p.extra_generation_params["Sampler Eta"] = shared.opts.scheduler_eta if shared.opts.scheduler_eta is not None and shared.opts.scheduler_eta > 0 and shared.opts.scheduler_eta < 1 else None
+    if shared.opts.scheduler_eta is not None and shared.opts.scheduler_eta > 0 and shared.opts.scheduler_eta < 1:
+        p.extra_generation_params["Sampler Eta"] = shared.opts.scheduler_eta
     try:
         t0 = time.time()
         output = shared.sd_model(**base_args) # pylint: disable=not-callable
@@ -567,7 +575,7 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
     if p.is_hr_pass:
         p.init_hr()
         prev_job = shared.state.job
-        if p.width != p.hr_upscale_to_x or p.height != p.hr_upscale_to_y:
+        if hasattr(p, 'height') and hasattr(p, 'width') and (p.width != p.hr_upscale_to_x or p.height != p.hr_upscale_to_y):
             p.ops.append('upscale')
             if shared.opts.save and not p.do_not_save_samples and shared.opts.save_images_before_highres_fix and hasattr(shared.sd_model, 'vae'):
                 save_intermediate(latents=output.images, suffix="-before-hires")
@@ -656,7 +664,6 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
             shared.state.sampling_steps = refiner_args['num_inference_steps']
             try:
                 shared.sd_refiner.register_to_config(requires_aesthetics_score=shared.opts.diffusers_aesthetics_score)
-                print('HERE req', shared.sd_refiner.config.requires_aesthetics_score)
                 refiner_output = shared.sd_refiner(**refiner_args) # pylint: disable=not-callable
             except AssertionError as e:
                 shared.log.info(e)
