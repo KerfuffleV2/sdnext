@@ -1,14 +1,15 @@
 # Change Log for SD.Next
 
-## Update for 2023-12-19
+## Update for 2023-12-22
 
 *Note*: based on `diffusers==0.25.0.dev0`
 
 - **Control**
   - native implementation of **ControlNet**, **ControlNet XS** and **T2I Adapters**  
+  - top-level **Control** next to **Text** and **Image** generate
   - supports all variations of **SD15** and **SD-XL** models
-  - supports *text*, *image*, *batch* and *video* processing  
-  - for details see Wiki documentation:  
+  - supports *Text*, *Image*, *Batch* and *Video* processing  
+  - for details and list of supported models and workflows, see Wiki documentation:  
     <https://github.com/vladmandic/automatic/wiki/Control>
 - **Diffusers**
   - **AnimateDiff**  
@@ -27,6 +28,10 @@
     - select from *networks -> reference*  
   - [Playground v1](https://huggingface.co/playgroundai/playground-v1), [Playground v2 256](https://huggingface.co/playgroundai/playground-v2-256px-base), [Playground v2 512](https://huggingface.co/playgroundai/playground-v2-512px-base), [Playground v2 1024](https://huggingface.co/playgroundai/playground-v2-1024px-aesthetic) model support  
     - simply select from *networks -> reference* and use as usual  
+  - [BLIP-Diffusion](https://dxli94.github.io/BLIP-Diffusion-website/)  
+    - img2img model that can replace subjects in images using prompt keywords  
+    - download and load by selecting from *networks -> reference -> blip diffusion*
+    - in image tab, select `blip diffusion` script
   - [DemoFusion](https://github.com/PRIS-CV/DemoFusion) run your SDXL generations at any resolution!  
     - in **Text** tab select *script* -> *demofusion*  
     - *note*: GPU VRAM limits do not automatically go away so be careful when using it with large resolutions  
@@ -38,8 +43,15 @@
       <https://github.com/vladmandic/automatic/blob/dev/scripts/example.py>  
   - **Schedulers**  
     - add timesteps range, changing it will make scheduler to be over-complete or under-complete  
-    - add rescale betas with zero SNR option (applicable to Euler and DDIM, allows for higher dynamic range)  
+    - add rescale betas with zero SNR option (applicable to Euler, Euler a and DDIM, allows for higher dynamic range)  
+  - **UI**  
+    - 3 new native UI themes: **orchid-dreams**, **emerald-paradise** and **timeless-beige**, thanks @illu_Zn
+    - more dynamic controls depending on the backend (original or diffusers)  
+      controls that are not applicable in current mode are now hidden  
+    - allow setting of resize method directly in image tab  
+      (previously via settings -> upscaler_for_img2img)  
 - **General**  
+  - support for **Torch 2.1.2**
   - **Process** create videos from batch or folder processing  
       supports *GIF*, *PNG* and *MP4* with full interpolation, scene change detection, etc.  
   - **LoRA**  
@@ -65,14 +77,15 @@
   - **OpenVINO**, thanks @disty0  
     - add *Directory for OpenVINO cache* option to *System Paths*  
     - remove Intel ARC specific 1024x1024 workaround  
-  - **UI**  
-    - more dynamic controls depending on the backend (original or diffusers)  
-      controls that are not applicable in current mode are now hidden  
-    - allow setting of resize method directly in image tab  
-      (previously via settings -> upscaler_for_img2img)  
   - **HDR controls**  
     - batch-aware for enhancement of multiple images or video frames  
     - available in image tab  
+  - **Logging**
+    - additional *TRACE* logging enabled via specific env variables  
+      see <https://github.com/vladmandic/automatic/wiki/Debug> for details  
+    - improved profiling  
+      use with `--debug --profile`  
+    - log output file sizes  
   - **Other**  
     - **API** several minor but breaking changes to API behavior to better align response fields, thanks @Trojaner
     - **Inpaint** add option `apply_overlay` to control if inpaint result should be applied as overlay or as-is  
@@ -86,12 +99,12 @@
     - add hdr settings to metadata  
     - improve handling of long filenames and filenames during batch processing  
     - do not set preview samples when using via api  
-    - log output file sizes  
     - avoid unnecessary resizes in img2img and inpaint  
     - updated `cli/simple-txt2img.py` and `cli/simple-img2img.py` scripts  
     - save `params.txt` regardless of image save status  
     - update built-in log monitor in ui, thanks @midcoastal  
-    - major CHANGELOG cleanup, thanks @JetVarimax
+    - major CHANGELOG doc cleanup, thanks @JetVarimax  
+    - major INSTALL doc cleanup, thanks JetVarimax  
 
 ## Update for 2023-12-04
 

@@ -67,6 +67,7 @@ def setup_logging():
         def get(self):
             return self.buffer
 
+    from functools import partial, partialmethod
     from logging.handlers import RotatingFileHandler
     from rich.theme import Theme
     from rich.logging import RichHandler
@@ -77,6 +78,11 @@ def setup_logging():
     if args.log:
         global log_file # pylint: disable=global-statement
         log_file = args.log
+
+    logging.TRACE = 25
+    logging.addLevelName(logging.TRACE, 'TRACE')
+    logging.Logger.trace = partialmethod(logging.Logger.log, logging.TRACE)
+    logging.trace = partial(logging.log, logging.TRACE)
 
     level = logging.DEBUG if args.debug else logging.INFO
     log.setLevel(logging.DEBUG) # log to file is always at level debug for facility `sd`
@@ -930,7 +936,7 @@ def add_args(parser):
     group.add_argument('--reset', default = os.environ.get("SD_RESET",False), action='store_true', help = "Reset main repository to latest version, default: %(default)s")
     group.add_argument('--upgrade', default = os.environ.get("SD_UPGRADE",False), action='store_true', help = "Upgrade main repository to latest version, default: %(default)s")
     group.add_argument('--requirements', default = os.environ.get("SD_REQUIREMENTS",False), action='store_true', help = "Force re-check of requirements, default: %(default)s")
-    group.add_argument('--quick', default = os.environ.get("SD_QUICK",False), action='store_true', help = "Run with startup sequence only, default: %(default)s")
+    group.add_argument('--quick', default = os.environ.get("SD_QUICK",False), action='store_true', help = "Bypass version checks, default: %(default)s")
     group.add_argument('--use-directml', default = os.environ.get("SD_USEDIRECTML",False), action='store_true', help = "Use DirectML if no compatible GPU is detected, default: %(default)s")
     group.add_argument("--use-openvino", default = os.environ.get("SD_USEOPENVINO",False), action='store_true', help="Use Intel OpenVINO backend, default: %(default)s")
     group.add_argument("--use-ipex", default = os.environ.get("SD_USEIPEX",False), action='store_true', help="Force use Intel OneAPI XPU backend, default: %(default)s")
