@@ -25,7 +25,10 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
     is_refiner_enabled = p.enable_hr and p.refiner_steps > 0 and p.refiner_start > 0 and p.refiner_start < 1 and shared.sd_refiner is not None
 
     if hasattr(shared.sd_model, 'preprocess'):
-        shared.sd_model = shared.sd_model.preprocess(p.batch_size, p.height, p.width)
+        shared.sd_model = shared.sd_model.preprocess(p)
+
+    if hasattr(shared.sd_model, 'override_processing'):
+        shared.sd_model.override_processing(p)
 
     if getattr(p, 'init_images', None) is not None and len(p.init_images) > 0:
         tgt_width, tgt_height = 8 * math.ceil(p.init_images[0].width / 8), 8 * math.ceil(p.init_images[0].height / 8)
