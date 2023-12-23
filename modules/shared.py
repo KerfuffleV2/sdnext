@@ -314,22 +314,26 @@ options_templates.update(options_section(('cuda', "Compute Settings"), {
     "cuda_compile": OptionInfo(False if not cmd_opts.use_openvino else True, "Compile UNet"),
     "cuda_compile_vae": OptionInfo(False if not cmd_opts.use_openvino else True, "Compile VAE"),
     "cuda_compile_upscaler": OptionInfo(False if not cmd_opts.use_openvino else True, "Compile upscaler"),
-    "cuda_compile_backend": OptionInfo("none" if not cmd_opts.use_openvino else "openvino_fx", "Model compile backend", gr.Radio, {"choices": ['none', 'inductor', 'cudagraphs', 'aot_ts_nvfuser', 'hidet', 'ipex', 'openvino_fx', 'stable-fast']}),
+    "cuda_compile_backend": OptionInfo("none" if not cmd_opts.use_openvino else "openvino_fx", "Model compile backend", gr.Radio, {"choices": ['none', 'inductor', 'cudagraphs', 'aot_ts_nvfuser', 'hidet', 'ipex', 'openvino_fx', 'stable-fast', 'olive-ai']}),
     "cuda_compile_mode": OptionInfo("default", "Model compile mode", gr.Radio, {"choices": ['default', 'reduce-overhead', 'max-autotune', 'max-autotune-no-cudagraphs']}),
     "cuda_compile_fullgraph": OptionInfo(False, "Model compile fullgraph"),
     "cuda_compile_precompile": OptionInfo(False, "Model compile precompile"),
     "cuda_compile_verbose": OptionInfo(False, "Model compile verbose mode"),
     "cuda_compile_errors": OptionInfo(True, "Model compile suppress errors"),
 
-    "ipex_sep": OptionInfo("<h2>IPEX, DirectML and OpenVINO</h2>", "", gr.HTML),
+    "ipex_sep": OptionInfo("<h2>IPEX and OpenVINO</h2>", "", gr.HTML),
     "ipex_optimize": OptionInfo(False if not devices.backend == "ipex" else True, "Enable IPEX Optimize for Intel GPUs"),
     "ipex_optimize_upscaler": OptionInfo(False if not devices.backend == "ipex" else True, "Enable IPEX Optimize for Intel GPUs with Upscalers"),
-    "directml_memory_provider": OptionInfo(default_memory_provider, 'DirectML memory stats provider', gr.Radio, {"choices": memory_providers}),
-    "directml_catch_nan": OptionInfo(False, "DirectML retry specific operation when NaN is produced if possible. (makes generation slower)"),
     "openvino_disable_model_caching": OptionInfo(False, "OpenVINO disable model caching"),
     "openvino_hetero_gpu": OptionInfo(False, "OpenVINO use Hetero Device for single inference with multiple devices"),
     "openvino_remove_cpu_from_hetero": OptionInfo(False, "OpenVINO remove CPU from Hetero Device"),
     "openvino_remove_igpu_from_hetero": OptionInfo(False, "OpenVINO remove iGPU from Hetero Device"),
+
+    "directml_olive_sep": OptionInfo("<h2>DirectML and Olive</h2>", "", gr.HTML),
+    "directml_memory_provider": OptionInfo(default_memory_provider, 'DirectML memory stats provider', gr.Radio, {"choices": memory_providers}),
+    "directml_catch_nan": OptionInfo(False, "DirectML retry specific operation when NaN is produced if possible. (makes generation slower)"),
+    "olive_float16": OptionInfo(True, 'Olive use FP16 on optimization (will use FP32 if unchecked)'),
+    "olive_cache_optimized": OptionInfo(True, 'Olive cache optimized models'),
 }))
 
 options_templates.update(options_section(('advanced', "Inference Settings"), {
@@ -381,11 +385,6 @@ options_templates.update(options_section(('diffusers', "Diffusers Settings"), {
     "onnx_sep": OptionInfo("<h2>ONNX Runtime</h2>", "", gr.HTML),
     "onnx_execution_provider": OptionInfo(get_default_execution_provider().value, 'Execution Provider', gr.Dropdown, lambda: {"choices": available_execution_providers }),
     "onnx_cache_converted": OptionInfo(True, 'Cache converted models'),
-
-    "onnx_olive_sep": OptionInfo("<h3>Olive</h3>", "", gr.HTML),
-    "onnx_enable_olive": OptionInfo(False, 'Optimize ONNX pipeline using Olive'),
-    "onnx_olive_float16": OptionInfo(True, 'Olive use FP16 on optimization (will use FP32 if unchecked)'),
-    "onnx_cache_optimized": OptionInfo(True, 'Olive cache optimized models'),
 }))
 
 options_templates.update(options_section(('system-paths', "System Paths"), {

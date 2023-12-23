@@ -17,7 +17,7 @@ from modules.processing import StableDiffusionProcessing, create_random_tensors
 import modules.prompt_parser_diffusers as prompt_parser_diffusers
 from modules.sd_hijack_hypertile import hypertile_set
 from modules.processing_correction import correction_callback
-from modules.onnx_pipelines import OnnxStableDiffusionPipeline
+from modules.onnx import optimize_pipeline as onnx_optimize_pipeline
 
 
 debug = shared.log.trace if os.environ.get('SD_DIFFUSERS_DEBUG', None) is not None else lambda *args, **kwargs: None
@@ -34,12 +34,6 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
 
     def is_refiner_enabled():
         return p.enable_hr and p.refiner_steps > 0 and p.refiner_start > 0 and p.refiner_start < 1 and shared.sd_refiner is not None
-
-    if hasattr(shared.sd_model, 'preprocess'):
-        shared.sd_model = shared.sd_model.preprocess(p)
-
-    if hasattr(shared.sd_model, 'override_processing'):
-        shared.sd_model.override_processing(p)
 
     if getattr(p, 'init_images', None) is not None and len(p.init_images) > 0:
         tgt_width, tgt_height = 8 * math.ceil(p.init_images[0].width / 8), 8 * math.ceil(p.init_images[0].height / 8)
@@ -326,7 +320,7 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
         generator = [torch.Generator(generator_device).manual_seed(s) for s in seeds]
         prompts, negative_prompts, prompts_2, negative_prompts_2 = fix_prompts(prompts, negative_prompts, prompts_2, negative_prompts_2)
         parser = 'Fixed attention'
-        if shared.opts.prompt_attention != 'Fixed attention' and 'StableDiffusion' in model.__class__.__name__ and not isinstance(model, OnnxStableDiffusionPipeline):
+        if shared.opts.prompt_attention != 'Fixed attention' and 'StableDiffusion' in model.__class__.__name__ and 'Onnx' not in model.__class__.__name__:
             try:
                 prompt_parser_diffusers.encode_prompts(model, p, prompts, negative_prompts, kwargs.get("num_inference_steps", 1), 0, kwargs.pop("clip_skip", None))
                 # prompt_embed, pooled, negative_embed, negative_pooled = , , , ,
@@ -456,7 +450,7 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
                 shared.compiled_model_state.batch_size = p.batch_size
                 shared.compiled_model_state.first_pass = False
             else:
-                pass #Can be implemented for TensorRT or Olive
+                pass #Can be implemented for TensorRT
         else:
             pass #Do nothing if compile is disabled
 
@@ -532,6 +526,7 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
         debug_steps(f'Steps: type=refiner input={p.refiner_steps} output={steps} start={p.refiner_start} denoise={p.denoising_strength}')
         return max(2, int(steps))
 
+    onnx_optimize_pipeline(p, is_refiner_enabled())
     base_args = set_pipeline_args(
         model=shared.sd_model,
         prompts=prompts,
@@ -598,6 +593,7 @@ def process_diffusers(p: StableDiffusionProcessing, seeds, prompts, negative_pro
             if (latent_scale_mode is not None or p.hr_force) and p.denoising_strength > 0:
                 p.ops.append('hires')
                 shared.sd_model = sd_models.set_diffuser_pipe(shared.sd_model, sd_models.DiffusersTaskType.IMAGE_2_IMAGE)
+                onnx_optimize_pipeline(p, is_refiner_enabled())
                 recompile_model(hires=True)
                 update_sampler(shared.sd_model, second_pass=True)
                 hires_args = set_pipeline_args(
