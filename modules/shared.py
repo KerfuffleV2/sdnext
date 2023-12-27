@@ -215,9 +215,11 @@ def readfile(filename, silent=False, lock=False):
     return data
 
 
-def writefile(data, filename, mode='w', silent=False):
+def writefile(data, filename, mode='w', silent=False, atomic=False):
     lock = None
     locked = False
+    import tempfile
+
 
     def default(obj):
         log.error(f"Saving: {filename} not a valid object: {obj}")
@@ -240,13 +242,21 @@ def writefile(data, filename, mode='w', silent=False):
             raise ValueError('not a valid object')
         lock = fasteners.InterProcessReaderWriterLock(f"{filename}.lock", logger=log)
         locked = lock.acquire_write_lock(blocking=True, timeout=3)
-        with open(filename, mode, encoding="utf8") as file:
-            file.write(output)
+        if atomic:
+            with tempfile.NamedTemporaryFile(mode=mode, encoding="utf8", delete=False, dir=os.path.dirname(filename)) as f:
+                f.write(output)
+                f.flush()
+                os.fsync(f.fileno())
+                os.replace(f.name, filename)
+        else:
+            with open(filename, mode=mode, encoding="utf8") as file:
+                file.write(output)
         t1 = time.time()
         if not silent:
             log.debug(f'Save: file="{filename}" json={len(data)} bytes={len(output)} time={t1-t0:.3f}')
     except Exception as e:
         log.error(f'Saving failed: {filename} {e}')
+        errors.display(e, 'Saving failed')
     finally:
         if lock is not None:
             lock.release_read_lock()
@@ -328,6 +338,7 @@ options_templates.update(options_section(('cuda', "Compute Settings"), {
     "openvino_hetero_gpu": OptionInfo(False, "OpenVINO use Hetero Device for single inference with multiple devices"),
     "openvino_remove_cpu_from_hetero": OptionInfo(False, "OpenVINO remove CPU from Hetero Device"),
     "openvino_remove_igpu_from_hetero": OptionInfo(False, "OpenVINO remove iGPU from Hetero Device"),
+    "openvino_compress_weights": OptionInfo(False, "OpenVINO compress weights to 8 bit (CPU Only)"),
 
     "directml_olive_sep": OptionInfo("<h2>DirectML and Olive</h2>", "", gr.HTML),
     "directml_memory_provider": OptionInfo(default_memory_provider, 'DirectML memory stats provider', gr.Radio, {"choices": memory_providers}),

@@ -363,7 +363,8 @@ def check_torch():
     log.debug(f'Torch allowed: cuda={allow_cuda} rocm={allow_rocm} ipex={allow_ipex} diml={allow_directml} openvino={allow_openvino}')
     torch_command = os.environ.get('TORCH_COMMAND', '')
     xformers_package = os.environ.get('XFORMERS_PACKAGE', 'none')
-    install('onnxruntime', 'onnxruntime', ignore=True)
+    if not installed('onnxruntime', quiet=True) and not installed('onnxruntime-gpu', quiet=True): # allow either
+        install('onnxruntime', 'onnxruntime', ignore=True)
     if torch_command != '':
         pass
     elif allow_cuda and (shutil.which('nvidia-smi') is not None or args.use_xformers or os.path.exists(os.path.join(os.environ.get('SystemRoot') or r'C:\Windows', 'System32', 'nvidia-smi.exe'))):
@@ -454,7 +455,7 @@ def check_torch():
         install('onnxruntime-openvino', 'onnxruntime-openvino', ignore=True)
     elif allow_openvino and args.use_openvino:
         log.info('Using OpenVINO')
-        torch_command = os.environ.get('TORCH_COMMAND', 'torch==2.1.1 torchvision==0.16.1 --index-url https://download.pytorch.org/whl/cpu')
+        torch_command = os.environ.get('TORCH_COMMAND', 'torch==2.1.2 torchvision==0.16.2 --index-url https://download.pytorch.org/whl/cpu')
     else:
         machine = platform.machine()
         if sys.platform == 'darwin':
@@ -523,6 +524,7 @@ def check_torch():
         install('hidet', 'hidet')
     if args.use_openvino or opts.get('cuda_compile_backend', '') == 'openvino_fx':
         install(os.environ.get('OPENVINO_PACKAGE', 'openvino==2023.2.0'), 'openvino')
+        install('nncf==2.7.0', 'nncf')
         install('onnxruntime-openvino', 'onnxruntime-openvino', ignore=True) # TODO openvino: numpy version conflicts with tensorflow and doesn't support Python 3.11
         os.environ.setdefault('PYTORCH_TRACING_MODE', 'TORCHFX')
         os.environ.setdefault('NEOReadDebugKeys', '1')
@@ -571,36 +573,6 @@ def install_packages():
         uninstall('bitsandbytes')
     if args.profile:
         print_profile(pr, 'Packages')
-
-
-# clone required repositories
-def install_repositories():
-    """
-    if args.profile:
-        pr = cProfile.Profile()
-        pr.enable()
-    def d(name):
-        return os.path.join(os.path.dirname(__file__), 'repositories', name)
-    log.info('Verifying repositories')
-    os.makedirs(os.path.join(os.path.dirname(__file__), 'repositories'), exist_ok=True)
-    stable_diffusion_repo = os.environ.get('STABLE_DIFFUSION_REPO', "https://github.com/Stability-AI/stablediffusion.git")
-    stable_diffusion_commit = os.environ.get('STABLE_DIFFUSION_COMMIT_HASH', None)
-    clone(stable_diffusion_repo, d('stable-diffusion-stability-ai'), stable_diffusion_commit)
-    taming_transformers_repo = os.environ.get('TAMING_TRANSFORMERS_REPO', "https://github.com/CompVis/taming-transformers.git")
-    taming_transformers_commit = os.environ.get('TAMING_TRANSFORMERS_COMMIT_HASH', None)
-    clone(taming_transformers_repo, d('taming-transformers'), taming_transformers_commit)
-    k_diffusion_repo = os.environ.get('K_DIFFUSION_REPO', 'https://github.com/crowsonkb/k-diffusion.git')
-    k_diffusion_commit = os.environ.get('K_DIFFUSION_COMMIT_HASH', '0455157')
-    clone(k_diffusion_repo, d('k-diffusion'), k_diffusion_commit)
-    codeformer_repo = os.environ.get('CODEFORMER_REPO', 'https://github.com/sczhou/CodeFormer.git')
-    codeformer_commit = os.environ.get('CODEFORMER_COMMIT_HASH', "7a584fd")
-    clone(codeformer_repo, d('CodeFormer'), codeformer_commit)
-    blip_repo = os.environ.get('BLIP_REPO', 'https://github.com/salesforce/BLIP.git')
-    blip_commit = os.environ.get('BLIP_COMMIT_HASH', None)
-    clone(blip_repo, d('BLIP'), blip_commit)
-    if args.profile:
-        print_profile(pr, 'Repositories')
-    """
 
 
 # run extension installer
@@ -775,6 +747,7 @@ def set_environment():
     os.environ.setdefault('USE_TORCH', '1')
     os.environ.setdefault('UVICORN_TIMEOUT_KEEP_ALIVE', '60')
     os.environ.setdefault('KINETO_LOG_LEVEL', '3')
+    os.environ.setdefault('DO_NOT_TRACK', '1')
     os.environ.setdefault('HF_HUB_CACHE', opts.get('hfcache_dir', os.path.join(os.path.expanduser('~'), '.cache', 'huggingface', 'hub')))
     log.debug(f'Cache folder: {os.environ.get("HF_HUB_CACHE")}')
     if sys.platform == 'darwin':

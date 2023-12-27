@@ -1,22 +1,29 @@
 # Change Log for SD.Next
 
-## Update for 2023-12-22
+## Update for 2023-12-26
 
 *Note*: based on `diffusers==0.25.0.dev0`
 
-- **Control**
-  - native implementation of **ControlNet**, **ControlNet XS** and **T2I Adapters**  
-  - top-level **Control** next to **Text** and **Image** generate
-  - supports all variations of **SD15** and **SD-XL** models
+- **Control**  
+  - native implementation of all image control methods:  
+    **ControlNet**, **ControlNet XS**, **Control LLLite**, **T2I Adapters** and **IP Adapters**  
+  - top-level **Control** next to **Text** and **Image** generate  
+  - supports all variations of **SD15** and **SD-XL** models  
   - supports *Text*, *Image*, *Batch* and *Video* processing  
   - for details and list of supported models and workflows, see Wiki documentation:  
-    <https://github.com/vladmandic/automatic/wiki/Control>
-- **Diffusers**
+    <https://github.com/vladmandic/automatic/wiki/Control>  
+- **Diffusers**  
   - **AnimateDiff**  
     - can now be used with *second pass* - enhance, upscale and hires your videos!  
   - **IP Adapter**  
     - add support for `ip-adapter-plus_sd15`, `ip-adapter-plus-face_sd15` and `ip-adapter-full-face_sd15`  
     - can now be used in *xyz-grid*  
+  - **FaceID**
+    - also based on IP adapters, but with additional face detection and external embeddings calculation  
+    - calculates face embeds based on input image and uses it to guide generation  
+    - simply select from *scripts -> faceid*  
+    - *experimental module*: requirements must be installed manually:  
+      > pip install insightface ip_adapter  
   - **Text-to-Video**  
     - in text tab, select `text-to-video` script  
     - supported models: ModelScope v1.7b, ZeroScope v1, ZeroScope v1.1, ZeroScope v2, ZeroScope v2 Dark, Potat v1  
@@ -51,13 +58,18 @@
     - allow setting of resize method directly in image tab  
       (previously via settings -> upscaler_for_img2img)  
 - **General**  
-  - support for **Torch 2.1.2**
+  - new **onboarding**  
+    if no models are found during startup, app will no longer ask to download default checkpoint  
+    instead, it will show message in UI with options to change model path or download any of the reference checkpoints  
+  - support for **Torch 2.1.2** (release) and **Torch 2.3** (dev)  
   - **Process** create videos from batch or folder processing  
       supports *GIF*, *PNG* and *MP4* with full interpolation, scene change detection, etc.  
   - **LoRA**  
     - add support for block weights, thanks @AI-Casanova  
       example `<lora:SDXL_LCM_LoRA:1.0:in=0:mid=1:out=0>`  
     - add support for LyCORIS GLora networks  
+    - add support for LoRA PEFT (*Diffusers*) networks  
+    - add support for Lora-OFT (*Kohya*) and Lyco-OFT (*Kohaku*) networks  
     - reintroduce alternative loading method in settings: `lora_force_diffusers`  
     - add support for `lora_fuse_diffusers` if using alternative method  
       use if you have multiple complex loras that may be causing performance degradation  
@@ -75,6 +87,9 @@
     - add `DISABLE_IPEXRUN` and `DISABLE_IPEX_1024_WA` environment variables  
     - compatibility improvements  
   - **OpenVINO**, thanks @disty0  
+    - **8 bit support for CPUs**  
+    - reduce System RAM usage  
+    - update to Torch 2.1.2  
     - add *Directory for OpenVINO cache* option to *System Paths*  
     - remove Intel ARC specific 1024x1024 workaround  
   - **HDR controls**  
@@ -93,6 +108,7 @@
     - **chaiNNer** fix `NaN` issues due to autocast  
     - **Upscale** increase limit from 4x to 8x given the quality of some upscalers  
     - **Extra Networks** fix sort  
+    - reduced default **CFG scale** from 6 to 4 to be more out-of-the-box compatibile with LCM/Turbo models
     - disable google fonts check on server startup  
     - fix torchvision/basicsr compatibility  
     - fix styles quick save  
@@ -100,6 +116,7 @@
     - improve handling of long filenames and filenames during batch processing  
     - do not set preview samples when using via api  
     - avoid unnecessary resizes in img2img and inpaint  
+    - safe handling of config updates avoid file corruption on I/O errors  
     - updated `cli/simple-txt2img.py` and `cli/simple-img2img.py` scripts  
     - save `params.txt` regardless of image save status  
     - update built-in log monitor in ui, thanks @midcoastal  

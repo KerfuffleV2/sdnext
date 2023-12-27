@@ -16,19 +16,19 @@ from modules import scripts, processing, shared, devices
 image_encoder = None
 image_encoder_type = None
 loaded = None
-ADAPTERS = [
-    'none',
-    'ip-adapter_sd15',
-    'ip-adapter_sd15_light',
-    'ip-adapter-plus_sd15',
-    'ip-adapter-plus-face_sd15',
-    'ip-adapter-full-face_sd15',
+ADAPTERS = {
+    'None': 'none',
+    'Base': 'ip-adapter_sd15',
+    'Light': 'ip-adapter_sd15_light',
+    'Plus': 'ip-adapter-plus_sd15',
+    'Plus Face': 'ip-adapter-plus-face_sd15',
+    'Full face': 'ip-adapter-full-face_sd15',
+    'Base SXDL': 'ip-adapter_sdxl',
     # 'models/ip-adapter_sd15_vit-G', # RuntimeError: mat1 and mat2 shapes cannot be multiplied (2x1024 and 1280x3072)
-    'ip-adapter_sdxl',
     # 'sdxl_models/ip-adapter_sdxl_vit-h',
     # 'sdxl_models/ip-adapter-plus_sdxl_vit-h',
     # 'sdxl_models/ip-adapter-plus-face_sdxl_vit-h',
-]
+}
 
 
 class Script(scripts.Script):
@@ -41,21 +41,23 @@ class Script(scripts.Script):
     def ui(self, _is_img2img):
         with gr.Accordion('IP Adapter', open=False, elem_id='ipadapter'):
             with gr.Row():
-                adapter = gr.Dropdown(label='Adapter', choices=ADAPTERS, value='none')
+                adapter = gr.Dropdown(label='Adapter', choices=list(ADAPTERS), value='none')
                 scale = gr.Slider(label='Scale', minimum=0.0, maximum=1.0, step=0.01, value=0.5)
             with gr.Row():
                 image = gr.Image(image_mode='RGB', label='Image', source='upload', type='pil', width=512)
         return [adapter, scale, image]
 
     def process(self, p: processing.StableDiffusionProcessing, adapter, scale, image): # pylint: disable=arguments-differ
-        from transformers import CLIPVisionModelWithProjection
         # overrides
+        adapter = ADAPTERS.get(adapter, None)
         if hasattr(p, 'ip_adapter_name'):
             adapter = p.ip_adapter_name
         if hasattr(p, 'ip_adapter_scale'):
             scale = p.ip_adapter_scale
         if hasattr(p, 'ip_adapter_image'):
             image = p.ip_adapter_image
+        if adapter is None:
+            return
         # init code
         global loaded, image_encoder, image_encoder_type # pylint: disable=global-statement
         if shared.sd_model is None:
@@ -88,6 +90,7 @@ class Script(scripts.Script):
                 return
             if image_encoder is None or image_encoder_type != shared.sd_model_type:
                 try:
+                    from transformers import CLIPVisionModelWithProjection
                     image_encoder = CLIPVisionModelWithProjection.from_pretrained("h94/IP-Adapter", subfolder=subfolder, torch_dtype=devices.dtype, cache_dir=shared.opts.diffusers_dir, use_safetensors=True).to(devices.device)
                     image_encoder_type = shared.sd_model_type
                 except Exception as e:

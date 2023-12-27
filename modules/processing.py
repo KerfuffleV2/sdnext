@@ -179,6 +179,7 @@ class StableDiffusionProcessing:
         self.all_subseeds = None
         self.clip_skip = clip_skip
         self.iteration = 0
+        self.is_control = False
         self.is_hr_pass = False
         self.is_refiner_pass = False
         self.hr_force = False
@@ -564,13 +565,13 @@ def create_infotext(p: StableDiffusionProcessing, all_prompts=None, all_seeds=No
     if index is None:
         index = position_in_batch + iteration * p.batch_size
     if all_prompts is None:
-        all_prompts = p.all_prompts
+        all_prompts = p.all_prompts or [p.prompt]
     if all_negative_prompts is None:
-        all_negative_prompts = p.all_negative_prompts
+        all_negative_prompts = p.all_negative_prompts or [p.negative_prompt]
     if all_seeds is None:
-        all_seeds = p.all_seeds
+        all_seeds = p.all_seeds or [p.seed]
     if all_subseeds is None:
-        all_subseeds = p.all_subseeds
+        all_subseeds = p.all_subseeds or [p.subseed]
     while len(all_prompts) <= index:
         all_prompts.append(all_prompts[-1])
     while len(all_seeds) <= index:
@@ -797,20 +798,9 @@ def validate_sample(tensor):
     return cast
 
 
-def process_images_inner(p: StableDiffusionProcessing) -> Processed:
-    """this is the main loop that both txt2img and img2img use; it calls func_init once inside all the scopes and func_sample once per batch"""
-
-    if type(p.prompt) == list:
-        assert len(p.prompt) > 0
-    else:
-        assert p.prompt is not None
-
+def process_init(p: StableDiffusionProcessing):
     seed = get_fixed_seed(p.seed)
     subseed = get_fixed_seed(p.subseed)
-    if shared.backend == shared.Backend.ORIGINAL:
-        modules.sd_hijack.model_hijack.apply_circular(p.tiling)
-        modules.sd_hijack.model_hijack.clear_comments()
-    comments = {}
     if type(p.prompt) == list:
         p.all_prompts = [shared.prompt_styles.apply_styles_to_prompt(x, p.styles) for x in p.prompt]
     else:
@@ -827,14 +817,31 @@ def process_images_inner(p: StableDiffusionProcessing) -> Processed:
         p.all_subseeds = subseed
     else:
         p.all_subseeds = [int(subseed) + x for x in range(len(p.all_prompts))]
-    if os.path.exists(shared.opts.embeddings_dir) and not p.do_not_reload_embeddings and shared.backend == shared.Backend.ORIGINAL:
-        modules.sd_hijack.model_hijack.embedding_db.load_textual_inversion_embeddings(force_reload=False)
-    if p.scripts is not None and isinstance(p.scripts, modules.scripts.ScriptRunner):
-        p.scripts.process(p)
+
+
+def process_images_inner(p: StableDiffusionProcessing) -> Processed:
+    """this is the main loop that both txt2img and img2img use; it calls func_init once inside all the scopes and func_sample once per batch"""
+
+    if type(p.prompt) == list:
+        assert len(p.prompt) > 0
+    else:
+        assert p.prompt is not None
+
+    if shared.backend == shared.Backend.ORIGINAL:
+        modules.sd_hijack.model_hijack.apply_circular(p.tiling)
+        modules.sd_hijack.model_hijack.clear_comments()
+    comments = {}
     infotexts = []
     output_images = []
     cached_uc = [None, None]
     cached_c = [None, None]
+
+    process_init(p)
+    if os.path.exists(shared.opts.embeddings_dir) and not p.do_not_reload_embeddings and shared.backend == shared.Backend.ORIGINAL:
+        modules.sd_hijack.model_hijack.embedding_db.load_textual_inversion_embeddings(force_reload=False)
+    if p.scripts is not None and isinstance(p.scripts, modules.scripts.ScriptRunner):
+        p.scripts.process(p)
+
 
     def get_conds_with_caching(function, required_prompts, steps, cache):
         if cache[0] is not None and (required_prompts, steps) == cache[0]:
@@ -1254,9 +1261,9 @@ class StableDiffusionProcessingImg2Img(StableDiffusionProcessing):
             self.mask_blur_y = value
 
     def init(self, all_prompts, all_seeds, all_subseeds):
-        if shared.backend == shared.Backend.DIFFUSERS and self.image_mask is not None:
+        if shared.backend == shared.Backend.DIFFUSERS and self.image_mask is not None and not self.is_control:
             shared.sd_model = modules.sd_models.set_diffuser_pipe(self.sd_model, modules.sd_models.DiffusersTaskType.INPAINTING)
-        elif shared.backend == shared.Backend.DIFFUSERS and self.image_mask is None:
+        elif shared.backend == shared.Backend.DIFFUSERS and self.image_mask is None and not self.is_control:
             shared.sd_model = modules.sd_models.set_diffuser_pipe(self.sd_model, modules.sd_models.DiffusersTaskType.IMAGE_2_IMAGE)
 
         if self.sampler_name == "PLMS":

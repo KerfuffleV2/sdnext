@@ -1,48 +1,36 @@
 import os
 import time
-from diffusers import StableDiffusionPipeline
-from diffusers import StableDiffusionXLPipeline
-from diffusers import ControlNetModel, StableDiffusionControlNetPipeline, StableDiffusionXLControlNetPipeline
+from typing import Union
 from modules.shared import log, opts
 from modules import errors
 
+ok = True
+try:
+    from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline, ControlNetXSModel, StableDiffusionControlNetXSPipeline, StableDiffusionXLControlNetXSPipeline
+except Exception:
+    from diffusers import ControlNetModel
+    ControlNetXSModel = ControlNetModel # dummy
+    ok = False
 
-what = 'ControlNet'
+
+what = 'ControlNet-XS'
 debug = log.trace if os.environ.get('SD_CONTROL_DEBUG', None) is not None else lambda *args, **kwargs: None
 debug('Trace: CONTROL')
 predefined_sd15 = {
-    'OpenPose': "lllyasviel/control_v11p_sd15_openpose",
-    'Canny': "lllyasviel/control_v11p_sd15_canny",
-    'MLDS': "lllyasviel/control_v11p_sd15_mlsd",
-    'Scribble': "lllyasviel/control_v11p_sd15_scribble",
-    'SoftEdge': "lllyasviel/control_v11p_sd15_softedge",
-    'Segment': "lllyasviel/control_v11p_sd15_seg",
-    'Depth': "lllyasviel/control_v11f1p_sd15_depth",
-    'NormalBae': "lllyasviel/control_v11p_sd15_normalbae",
-    'LineArt': "lllyasviel/control_v11p_sd15_lineart",
-    'LineArt Anime': "lllyasviel/control_v11p_sd15s2_lineart_anime",
-    'Shuffle': "lllyasviel/control_v11e_sd15_shuffle",
-    'IP2P': "lllyasviel/control_v11e_sd15_ip2p",
-    'HED': "lllyasviel/sd-controlnet-hed",
-    'Tile': "lllyasviel/control_v11f1e_sd15_tile",
-    'TemporalNet': "CiaraRowles/TemporalNet",
 }
 predefined_sdxl = {
-    'Canny Small XL': 'diffusers/controlnet-canny-sdxl-1.0-small',
-    'Canny Mid XL': 'diffusers/controlnet-canny-sdxl-1.0-mid',
-    'Canny XL': 'diffusers/controlnet-canny-sdxl-1.0',
-    'Depth Zoe XL': 'diffusers/controlnet-zoe-depth-sdxl-1.0',
-    'Depth Mid XL': 'diffusers/controlnet-depth-sdxl-1.0-mid',
+    'Canny': 'UmerHA/ConrolNetXS-SDXL-canny',
+    'Depth': 'UmerHA/ConrolNetXS-SDXL-depth',
 }
 models = {}
 all_models = {}
 all_models.update(predefined_sd15)
 all_models.update(predefined_sdxl)
-cache_dir = 'models/control/controlnets'
+cache_dir = 'models/control/xs'
 
 
 def find_models():
-    path = os.path.join(opts.control_dir, 'controlnets')
+    path = os.path.join(opts.control_dir, 'xs')
     files = os.listdir(path)
     files = [f for f in files if f.endswith('.safetensors')]
     downloaded_models = {}
@@ -54,8 +42,10 @@ def find_models():
 
 
 def list_models(refresh=False):
-    import modules.shared
     global models # pylint: disable=global-statement
+    if not ok:
+        return models
+    import modules.shared
     if not refresh and len(models) > 0:
         return models
     models = {}
@@ -66,19 +56,19 @@ def list_models(refresh=False):
     elif modules.shared.sd_model_type == 'sd':
         models = ['None'] + sorted(predefined_sd15) + sorted(find_models())
     else:
-        log.warning(f'Control {what} model list failed: unknown model type')
+        log.error(f'Control {what} model list failed: unknown model type')
         models = ['None'] + sorted(predefined_sd15) + sorted(predefined_sdxl) + sorted(find_models())
     debug(f'Control list {what}: path={cache_dir} models={models}')
     return models
 
 
-class ControlNet():
+class ControlNetXS():
     def __init__(self, model_id: str = None, device = None, dtype = None, load_config = None):
-        self.model: ControlNetModel = None
+        self.model: ControlNetXSModel = None
         self.model_id: str = model_id
         self.device = device
         self.dtype = dtype
-        self.load_config = { 'cache_dir': cache_dir }
+        self.load_config = { 'cache_dir': cache_dir, 'learn_embedding': True }
         if load_config is not None:
             self.load_config.update(load_config)
         if model_id is not None:
@@ -90,7 +80,7 @@ class ControlNet():
         self.model = None
         self.model_id = None
 
-    def load(self, model_id: str = None) -> str:
+    def load(self, model_id: str = None, time_embedding_mix: float = 0.0) -> str:
         try:
             t0 = time.time()
             model_id = model_id or self.model_id
@@ -103,11 +93,12 @@ class ControlNet():
             if model_path is None:
                 log.error(f'Control {what} model load failed: id="{model_id}" error=unknown model id')
                 return
-            log.debug(f'Control {what} model loading: id="{model_id}" path="{model_path}"')
+            self.load_config['time_embedding_mix'] = time_embedding_mix
+            log.debug(f'Control {what} model loading: id="{model_id}" path="{model_path}" {self.load_config}')
             if model_path.endswith('.safetensors'):
-                self.model = ControlNetModel.from_single_file(model_path, **self.load_config)
+                self.model = ControlNetXSModel.from_single_file(model_path, **self.load_config)
             else:
-                self.model = ControlNetModel.from_pretrained(model_path, **self.load_config)
+                self.model = ControlNetXSModel.from_pretrained(model_path, **self.load_config)
             if self.device is not None:
                 self.model.to(self.device)
             if self.dtype is not None:
@@ -122,16 +113,16 @@ class ControlNet():
             return f'{what} failed to load model: {model_id}'
 
 
-class ControlNetPipeline():
-    def __init__(self, controlnet: ControlNetModel | list[ControlNetModel], pipeline: StableDiffusionXLPipeline | StableDiffusionPipeline, dtype = None):
+class ControlNetXSPipeline():
+    def __init__(self, controlnet: Union[ControlNetXSModel, list[ControlNetXSModel]], pipeline: Union[StableDiffusionXLPipeline, StableDiffusionPipeline], dtype = None):
         t0 = time.time()
         self.orig_pipeline = pipeline
         self.pipeline = None
         if pipeline is None:
-            log.error('Control model pipeline: model not loaded')
+            log.error(f'Control {what} pipeline: model not loaded')
             return
         if isinstance(pipeline, StableDiffusionXLPipeline):
-            self.pipeline = StableDiffusionXLControlNetPipeline(
+            self.pipeline = StableDiffusionXLControlNetXSPipeline(
                 vae=pipeline.vae,
                 text_encoder=pipeline.text_encoder,
                 text_encoder_2=pipeline.text_encoder_2,
@@ -139,18 +130,19 @@ class ControlNetPipeline():
                 tokenizer_2=pipeline.tokenizer_2,
                 unet=pipeline.unet,
                 scheduler=pipeline.scheduler,
+                feature_extractor=getattr(pipeline, 'feature_extractor', None),
                 controlnet=controlnet, # can be a list
             ).to(pipeline.device)
         elif isinstance(pipeline, StableDiffusionPipeline):
-            self.pipeline = StableDiffusionControlNetPipeline(
+            self.pipeline = StableDiffusionControlNetXSPipeline(
                 vae=pipeline.vae,
                 text_encoder=pipeline.text_encoder,
                 tokenizer=pipeline.tokenizer,
                 unet=pipeline.unet,
                 scheduler=pipeline.scheduler,
+                feature_extractor=getattr(pipeline, 'feature_extractor', None),
                 requires_safety_checker=False,
                 safety_checker=None,
-                feature_extractor=None,
                 controlnet=controlnet, # can be a list
             ).to(pipeline.device)
         else:

@@ -6,7 +6,7 @@ from typing import Dict
 from urllib.parse import urlparse
 import PIL.Image as Image
 import rich.progress as p
-from modules import shared
+from modules import shared, errors
 from modules.upscaler import Upscaler, UpscalerLanczos, UpscalerNearest, UpscalerNone
 from modules.paths import script_path, models_path
 
@@ -68,6 +68,7 @@ def download_civit_meta(model_path: str, model_id):
             return msg
         except Exception as e:
             msg = f'CivitAI download error: id={model_id} url={url} file={fn} {e}'
+            errors.display(e, 'CivitAI download error')
             shared.log.error(msg)
             return msg
     return f'CivitAI download error: id={model_id} url={url} code={r.status_code}'
@@ -100,7 +101,8 @@ def download_civit_preview(model_path: str, preview_url: str):
     except Exception as e:
         os.remove(preview_file)
         res += f' error={e}'
-        shared.log.error(f'CivitAI download error: url={preview_url} file={preview_file} {e}')
+        shared.log.error(f'CivitAI download error: url={preview_url} file={preview_file} written={written} {e}')
+        errors.display(e, 'CivitAI download error')
     shared.state.end()
     if img is None:
         return res
@@ -292,8 +294,9 @@ def load_diffusers_models(model_path: str, command_path: str = None, clear=True)
                     if os.path.exists(os.path.join(folder, 'hidden')):
                         continue
                     output.append(name)
-                except Exception as e:
-                    shared.log.error(f"Error analyzing diffusers model: {folder} {e}")
+                except Exception:
+                    # shared.log.error(f"Error analyzing diffusers model: {folder} {e}")
+                    pass
         except Exception as e:
             shared.log.error(f"Error listing diffusers: {place} {e}")
     shared.log.debug(f'Scanning diffusers cache: {model_path} {command_path} items={len(output)} time={time.time()-t0:.2f}')
@@ -335,6 +338,27 @@ def load_reference(name: str):
         from modules import sd_models
         sd_models.list_models()
         return True
+
+
+def load_civitai(model: str, url: str):
+    from modules import sd_models
+    name, _ext = os.path.splitext(model)
+    info = sd_models.get_closet_checkpoint_match(name)
+    if info is not None:
+        shared.log.debug(f'Reference model: {name}')
+        return name # already downloaded
+    else:
+        shared.log.debug(f'Reference model: {name} download start')
+        download_civit_model_thread(model_name=model, model_url=url, model_path='', model_type='safetensors', preview=None, token=None)
+        shared.log.debug(f'Reference model: {name} download complete')
+        sd_models.list_models()
+        info = sd_models.get_closet_checkpoint_match(name)
+        if info is not None:
+            shared.log.debug(f'Reference model: {name}')
+            return name # already downloaded
+        else:
+            shared.log.debug(f'Reference model: {name} not found')
+            return None
 
 
 cache_folders = {}

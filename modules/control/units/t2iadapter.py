@@ -1,5 +1,6 @@
 import os
 import time
+from typing import Union
 from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline, T2IAdapter, MultiAdapter, StableDiffusionAdapterPipeline, StableDiffusionXLAdapterPipeline # pylint: disable=unused-import
 from modules.shared import log
 from modules import errors
@@ -33,7 +34,7 @@ models = {}
 all_models = {}
 all_models.update(predefined_sd15)
 all_models.update(predefined_sdxl)
-cache_dir = 'models/control/adapters'
+cache_dir = 'models/control/adapter'
 
 
 def list_models(refresh=False):
@@ -105,10 +106,10 @@ class Adapter():
 
 
 class AdapterPipeline():
-    def __init__(self, adapter: T2IAdapter | list[T2IAdapter], pipeline: StableDiffusionXLPipeline | StableDiffusionPipeline, dtype = None):
+    def __init__(self, adapter: Union[T2IAdapter, list[T2IAdapter]], pipeline: Union[StableDiffusionXLPipeline, StableDiffusionPipeline], dtype = None):
         t0 = time.time()
         self.orig_pipeline = pipeline
-        self.pipeline = None
+        self.pipeline: Union[StableDiffusionXLPipeline, StableDiffusionPipeline] = None
         if pipeline is None:
             log.error(f'Control {what} pipeline: model not loaded')
             return
@@ -124,6 +125,7 @@ class AdapterPipeline():
                 tokenizer_2=pipeline.tokenizer_2,
                 unet=pipeline.unet,
                 scheduler=pipeline.scheduler,
+                feature_extractor=getattr(pipeline, 'feature_extractor', None),
                 adapter=adapter,
             ).to(pipeline.device)
         elif isinstance(pipeline, StableDiffusionPipeline):
@@ -133,9 +135,9 @@ class AdapterPipeline():
                 tokenizer=pipeline.tokenizer,
                 unet=pipeline.unet,
                 scheduler=pipeline.scheduler,
+                feature_extractor=getattr(pipeline, 'feature_extractor', None),
                 requires_safety_checker=False,
                 safety_checker=None,
-                feature_extractor=None,
                 adapter=adapter,
             ).to(pipeline.device)
         else:
