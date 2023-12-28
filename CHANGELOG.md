@@ -1,6 +1,6 @@
 # Change Log for SD.Next
 
-## Update for 2023-12-27
+## Update for 2023-12-28
 
 - **Control**  
   - native implementation of all image control methods:  
@@ -30,14 +30,15 @@
     - *note*: GPU VRAM limits do not automatically go away so be careful when using it with large resolutions  
       in the future, expect more optimizations, especially related to offloading/slicing/tiling,  
       but at the moment this is pretty much experimental-only  
-  - **AnimateDiff**  
+  - [AnimateDiff](https://github.com/guoyww/animatediff/)  
+    - overall improved quality  
     - can now be used with *second pass* - enhance, upscale and hires your videos!  
-  - **IP Adapter**  
-    - add support for `ip-adapter-plus_sd15`, `ip-adapter-plus-face_sd15` and `ip-adapter-full-face_sd15`  
+  - [IP Adapter](https://github.com/tencent-ailab/IP-Adapter)  
+    - add support for **ip-adapter-plus_sd15, ip-adapter-plus-face_sd15 and ip-adapter-full-face_sd15**  
     - can now be used in *xyz-grid*  
   - **Text-to-Video**  
     - in text tab, select `text-to-video` script  
-    - supported models: ModelScope v1.7b, ZeroScope v1, ZeroScope v1.1, ZeroScope v2, ZeroScope v2 Dark, Potat v1  
+    - supported models: **ModelScope v1.7b, ZeroScope v1, ZeroScope v1.1, ZeroScope v2, ZeroScope v2 Dark, Potat v1**  
       *if you know of any other t2v models you'd like to see supported, let me know!*  
     - models are auto-downloaded on first use  
     - *note*: current base model will be unloaded to free up resources  
@@ -48,6 +49,8 @@
   - **Schedulers**  
     - add timesteps range, changing it will make scheduler to be over-complete or under-complete  
     - add rescale betas with zero SNR option (applicable to Euler, Euler a and DDIM, allows for higher dynamic range)  
+  - **Inpaint**  
+    - improved quality when using mask blur and padding  
   - **UI**  
     - 3 new native UI themes: **orchid-dreams**, **emerald-paradise** and **timeless-beige**, thanks @illu_Zn
     - more dynamic controls depending on the backend (original or diffusers)  
