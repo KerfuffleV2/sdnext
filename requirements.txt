@@ -24,7 +24,6 @@ lmdb
 lpips
 omegaconf
 open-clip-torch
-opencv-contrib-python-headless
 olive-ai
 optimum
 piexif
@@ -53,8 +52,8 @@ antlr4-python3-runtime==4.9.3
 requests==2.31.0
 tqdm==4.66.1
 accelerate==0.25.0
-opencv-python-headless==4.8.1.78
-diffusers==0.24.0
+opencv-contrib-python-headless==4.8.1.78
+diffusers==0.25.0
 einops==0.4.1
 gradio==3.43.2
 huggingface_hub==0.20.1

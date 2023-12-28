@@ -1,8 +1,6 @@
 # Change Log for SD.Next
 
-## Update for 2023-12-26
-
-*Note*: based on `diffusers==0.25.0.dev0`
+## Update for 2023-12-27
 
 - **Control**  
   - native implementation of all image control methods:  
@@ -13,27 +11,15 @@
   - for details and list of supported models and workflows, see Wiki documentation:  
     <https://github.com/vladmandic/automatic/wiki/Control>  
 - **Diffusers**  
-  - **AnimateDiff**  
-    - can now be used with *second pass* - enhance, upscale and hires your videos!  
-  - **IP Adapter**  
-    - add support for `ip-adapter-plus_sd15`, `ip-adapter-plus-face_sd15` and `ip-adapter-full-face_sd15`  
-    - can now be used in *xyz-grid*  
-  - **FaceID**
-    - also based on IP adapters, but with additional face detection and external embeddings calculation  
-    - calculates face embeds based on input image and uses it to guide generation  
-    - simply select from *scripts -> faceid*  
-    - *experimental module*: requirements must be installed manually:  
-      > pip install insightface ip_adapter  
-  - **Text-to-Video**  
-    - in text tab, select `text-to-video` script  
-    - supported models: ModelScope v1.7b, ZeroScope v1, ZeroScope v1.1, ZeroScope v2, ZeroScope v2 Dark, Potat v1  
-      *if you know of any other t2v models you'd like to see supported, let me know!*  
-    - models are auto-downloaded on first use  
-    - *note*: current base model will be unloaded to free up resources  
-  - [Segmind Vega](https://huggingface.co/segmind/Segmind-Vega) support  
+  - [Segmind Vega](https://huggingface.co/segmind/Segmind-Vega) model support  
     - small and fast version of **SDXL**, only 3.1GB in size!  
     - select from *networks -> reference*  
+  - [aMUSEd 256](https://huggingface.co/amused/amused-256) and [aMUSEd 512](https://huggingface.co/amused/amused-512) model support  
+    - lightweigt models that excel at fast image generation  
+    - *note*: must select: settings -> diffusers -> generator device: unset
+    - select from *networks -> reference*
   - [Playground v1](https://huggingface.co/playgroundai/playground-v1), [Playground v2 256](https://huggingface.co/playgroundai/playground-v2-256px-base), [Playground v2 512](https://huggingface.co/playgroundai/playground-v2-512px-base), [Playground v2 1024](https://huggingface.co/playgroundai/playground-v2-1024px-aesthetic) model support  
+    - comparable to SD15 and SD-XL, trained from scratch for highly aesthetic images  
     - simply select from *networks -> reference* and use as usual  
   - [BLIP-Diffusion](https://dxli94.github.io/BLIP-Diffusion-website/)  
     - img2img model that can replace subjects in images using prompt keywords  
@@ -44,6 +30,17 @@
     - *note*: GPU VRAM limits do not automatically go away so be careful when using it with large resolutions  
       in the future, expect more optimizations, especially related to offloading/slicing/tiling,  
       but at the moment this is pretty much experimental-only  
+  - **AnimateDiff**  
+    - can now be used with *second pass* - enhance, upscale and hires your videos!  
+  - **IP Adapter**  
+    - add support for `ip-adapter-plus_sd15`, `ip-adapter-plus-face_sd15` and `ip-adapter-full-face_sd15`  
+    - can now be used in *xyz-grid*  
+  - **Text-to-Video**  
+    - in text tab, select `text-to-video` script  
+    - supported models: ModelScope v1.7b, ZeroScope v1, ZeroScope v1.1, ZeroScope v2, ZeroScope v2 Dark, Potat v1  
+      *if you know of any other t2v models you'd like to see supported, let me know!*  
+    - models are auto-downloaded on first use  
+    - *note*: current base model will be unloaded to free up resources  
   - **Prompt scheduling** now implemented for Diffusers backend, thanks @AI-Casanova
   - **Custom pipelines** contribute by adding your own custom pipelines!  
     - for details, see fully documented example:  
@@ -57,10 +54,27 @@
       controls that are not applicable in current mode are now hidden  
     - allow setting of resize method directly in image tab  
       (previously via settings -> upscaler_for_img2img)  
+- **Optional**
+  - **FaceID** face guidance during generation  
+    - also based on IP adapters, but with additional face detection and external embeddings calculation  
+    - calculates face embeds based on input image and uses it to guide generation  
+    - simply select from *scripts -> faceid*  
+    - *experimental module*: requirements must be installed manually:  
+        > pip install insightface ip_adapter  
+  - **Depth 3D** image to 3D scene
+    - delivered as an extension, install from extensions tab  
+      <https://github.com/vladmandic/sd-extension-depth3d>  
+    - creates fully compatible 3D scene from any image by using depth estimation  
+      and creating a fully populated mesh  
+    - scene can be freely viewed in 3D in the UI itself or downloaded for use in other applications  
+  - [ONNX/Olive](https://github.com/vladmandic/automatic/wiki/ONNX-Olive)  
+    - major work continues in olive branch, see wiki for details, thanks @lshqqytiger  
+      as a highlight, 4-5 it/s using DirectML on AMD GPU translates to 23-25 it/s using ONNX/Olive!  
 - **General**  
   - new **onboarding**  
-    if no models are found during startup, app will no longer ask to download default checkpoint  
-    instead, it will show message in UI with options to change model path or download any of the reference checkpoints  
+    - if no models are found during startup, app will no longer ask to download default checkpoint  
+      instead, it will show message in UI with options to change model path or download any of the reference checkpoints  
+    - *extra networks -> models -> reference* section is now enabled for both original and diffusers backend  
   - support for **Torch 2.1.2** (release) and **Torch 2.3** (dev)  
   - **Process** create videos from batch or folder processing  
       supports *GIF*, *PNG* and *MP4* with full interpolation, scene change detection, etc.  
