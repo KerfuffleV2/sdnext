@@ -16,7 +16,7 @@ import modules.prompt_parser_diffusers as prompt_parser_diffusers
 from modules.sd_hijack_hypertile import hypertile_set
 from modules.processing_correction import correction_callback
 from modules.processing_vae import vae_encode, vae_decode
-from modules.onnx import optimize_pipeline as onnx_optimize_pipeline
+from modules.onnx import preprocess_pipeline as onnx_preprocess_pipeline
 
 
 debug = shared.log.trace if os.environ.get('SD_DIFFUSERS_DEBUG', None) is not None else lambda *args, **kwargs: None
@@ -424,7 +424,7 @@ def process_diffusers(p: StableDiffusionProcessing):
         debug_steps(f'Steps: type=refiner input={p.refiner_steps} output={steps} start={p.refiner_start} denoise={p.denoising_strength}')
         return max(2, int(steps))
 
-    onnx_optimize_pipeline(p, is_refiner_enabled())
+    onnx_preprocess_pipeline(p, is_refiner_enabled())
     base_args = set_pipeline_args(
         model=shared.sd_model,
         prompts=p.prompts,
@@ -495,7 +495,7 @@ def process_diffusers(p: StableDiffusionProcessing):
             if (latent_scale_mode is not None or p.hr_force) and p.denoising_strength > 0:
                 p.ops.append('hires')
                 shared.sd_model = sd_models.set_diffuser_pipe(shared.sd_model, sd_models.DiffusersTaskType.IMAGE_2_IMAGE)
-                onnx_optimize_pipeline(p, is_refiner_enabled())
+                onnx_preprocess_pipeline(p, is_refiner_enabled())
                 recompile_model(hires=True)
                 update_sampler(shared.sd_model, second_pass=True)
                 hires_args = set_pipeline_args(
