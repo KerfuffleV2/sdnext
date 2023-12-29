@@ -339,6 +339,8 @@ options_templates.update(options_section(('cuda', "Compute Settings"), {
     "openvino_remove_cpu_from_hetero": OptionInfo(False, "OpenVINO remove CPU from Hetero Device"),
     "openvino_remove_igpu_from_hetero": OptionInfo(False, "OpenVINO remove iGPU from Hetero Device"),
     "openvino_compress_weights": OptionInfo(False, "OpenVINO compress weights to 8 bit (CPU Only)"),
+    "nncf_compress_weights": OptionInfo(False, "Compress Model weights to 8 bit with NNCF"),
+    "nncf_compress_vae_weights": OptionInfo(False, "Compress VAE weights to 8 bit with NNCF"),
 
     "directml_olive_sep": OptionInfo("<h2>DirectML and Olive</h2>", "", gr.HTML),
     "directml_memory_provider": OptionInfo(default_memory_provider, 'DirectML memory stats provider', gr.Radio, {"choices": memory_providers}),

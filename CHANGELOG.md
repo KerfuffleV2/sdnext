@@ -39,7 +39,7 @@
   - **Text-to-Video**  
     - in text tab, select `text-to-video` script  
     - supported models: **ModelScope v1.7b, ZeroScope v1, ZeroScope v1.1, ZeroScope v2, ZeroScope v2 Dark, Potat v1**  
-      *if you know of any other t2v models you'd like to see supported, let me know!*  
+      *if you know of any other t2v models youd like to see supported, let me know!*  
     - models are auto-downloaded on first use  
     - *note*: current base model will be unloaded to free up resources  
   - **Prompt scheduling** now implemented for Diffusers backend, thanks @AI-Casanova
@@ -99,10 +99,11 @@
       if you get file not found errors, set `DISABLE_IPEXRUN=1` and run the webui with `--reinstall`  
     - built-in *MKL* and *DPCPP* for IPEX, no need to install OneAPI anymore  
     - **StableVideoDiffusion** is now supported with IPEX  
+    - **8 bit support with NNCF** on Diffusers backend  
     - fix IPEX Optimize not applying with Diffusers backend  
     - disable 32bit workarounds if the GPU supports 64bit  
     - add `DISABLE_IPEXRUN` and `DISABLE_IPEX_1024_WA` environment variables  
-    - compatibility improvements  
+    - performance and compatibility improvements  
   - **OpenVINO**, thanks @disty0  
     - **8 bit support for CPUs**  
     - reduce System RAM usage  
