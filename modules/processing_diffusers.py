@@ -5,6 +5,7 @@ import inspect
 import typing
 import torch
 import torchvision.transforms.functional as TF
+import numpy as np
 import modules.devices as devices
 import modules.shared as shared
 import modules.sd_samplers as sd_samplers
@@ -75,7 +76,9 @@ def process_diffusers(p: StableDiffusionProcessing):
             for j in range(len(decoded)):
                 images.save_image(decoded[j], path=p.outpath_samples, basename="", seed=p.seeds[i], prompt=p.prompts[i], extension=shared.opts.samples_format, info=info, p=p, suffix=suffix)
 
-    def diffusers_callback_legacy(step: int, timestep: int, latents: torch.FloatTensor):
+    def diffusers_callback_legacy(step: int, timestep: int, latents: typing.Union[torch.FloatTensor, np.ndarray]):
+        if isinstance(latents, np.ndarray): # latents from Onnx pipelines is ndarray.
+            latents = torch.from_numpy(latents)
         shared.state.sampling_step = step
         shared.state.current_latent = latents
         latents = correction_callback(p, timestep, {'latents': latents})
