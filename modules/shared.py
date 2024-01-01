@@ -318,7 +318,7 @@ options_templates.update(options_section(('cuda', "Compute Settings"), {
     "other_sep": OptionInfo("<h2>Execution precision</h2>", "", gr.HTML),
     "opt_channelslast": OptionInfo(False, "Use channels last as torch memory format "),
     "cudnn_benchmark": OptionInfo(False, "Enable full-depth cuDNN benchmark feature"),
-    "torch_gc_threshold": OptionInfo(80 if devices.backend == "ipex" else 90, "VRAM usage threshold before running Torch GC to clear up VRAM", gr.Slider, {"minimum": 0, "maximum": 100, "step": 1}),
+    "torch_gc_threshold": OptionInfo(80, "Memory usage threshold before running Torch GC", gr.Slider, {"minimum": 0, "maximum": 100, "step": 1}),
 
     "cuda_compile_sep": OptionInfo("<h2>Model Compile</h2>", "", gr.HTML),
     "cuda_compile": OptionInfo(False if not cmd_opts.use_openvino else True, "Compile UNet"),
@@ -365,10 +365,10 @@ options_templates.update(options_section(('advanced', "Inference Settings"), {
     "freeu_s2": OptionInfo(0.2, "2nd stage skip factor", gr.Slider, {"minimum": 0.0, "maximum": 1.0, "step": 0.01}),
 
     "hypertile_sep": OptionInfo("<h2>HyperTile</h2>", "", gr.HTML),
-    "hypertile_vae_enabled": OptionInfo(False, "HyperTile for VAE enabled", gr.Checkbox, {"visible": False}),
-    "hypertile_vae_tile": OptionInfo(128, "HyperTile for VAE tile size", gr.Slider, {"minimum": 128, "maximum": 512, "step": 8, "visible": False}),
     "hypertile_unet_enabled": OptionInfo(False, "HyperTile for UNet enabled"),
-    "hypertile_unet_tile": OptionInfo(256, "HyperTile for UNet tile size", gr.Slider, {"minimum": 256, "maximum": 1024, "step": 8}),
+    "hypertile_unet_tile": OptionInfo(256, "HyperTile for UNet tile size", gr.Slider, {"minimum": 0, "maximum": 1024, "step": 8}),
+    "hypertile_vae_enabled": OptionInfo(False, "HyperTile for VAE enabled", gr.Checkbox),
+    "hypertile_vae_tile": OptionInfo(128, "HyperTile for VAE tile size", gr.Slider, {"minimum": 0, "maximum": 1024, "step": 8}),
 
     "inference_other_sep": OptionInfo("<h2>Other</h2>", "", gr.HTML),
     "batch_frame_mode": OptionInfo(False, "Process multiple images in batch in parallel"),
@@ -484,6 +484,7 @@ options_templates.update(options_section(('saving-paths', "Image Naming & Paths"
     "outdir_samples": OptionInfo("", "Output directory for images", component_args=hide_dirs, folder=True),
     "outdir_txt2img_samples": OptionInfo("outputs/text", 'Directory for text generate', component_args=hide_dirs, folder=True),
     "outdir_img2img_samples": OptionInfo("outputs/image", 'Directory for image generate', component_args=hide_dirs, folder=True),
+    "outdir_control_samples": OptionInfo("outputs/control", 'Directory for control generate', component_args=hide_dirs, folder=True),
     "outdir_extras_samples": OptionInfo("outputs/extras", 'Directory for processed images', component_args=hide_dirs, folder=True),
     "outdir_save": OptionInfo("outputs/save", "Directory for manually saved images", component_args=hide_dirs, folder=True),
     "outdir_video": OptionInfo("outputs/video", "Directory for videos", component_args=hide_dirs, folder=True),
@@ -495,6 +496,7 @@ options_templates.update(options_section(('saving-paths', "Image Naming & Paths"
     "outdir_grids": OptionInfo("", "Output directory for grids", component_args=hide_dirs, folder=True),
     "outdir_txt2img_grids": OptionInfo("outputs/grids", 'Output directory for txt2img grids', component_args=hide_dirs, folder=True),
     "outdir_img2img_grids": OptionInfo("outputs/grids", 'Output directory for img2img grids', component_args=hide_dirs, folder=True),
+    "outdir_control_grids": OptionInfo("outputs/grids", 'Output directory for control grids', component_args=hide_dirs, folder=True),
 }))
 
 options_templates.update(options_section(('ui', "User Interface"), {

@@ -1,9 +1,9 @@
 import os
 import time
-import torch
 from PIL import Image
 from modules.shared import log
 from modules.errors import display
+from modules import devices
 
 from modules.control.proc.hed import HEDdetector
 from modules.control.proc.canny import CannyDetector
@@ -22,6 +22,7 @@ from modules.control.proc.openpose import OpenposeDetector
 from modules.control.proc.dwpose import DWposeDetector
 from modules.control.proc.segment_anything import SamDetector
 from modules.control.proc.zoe import ZoeDetector
+from modules.control.proc.marigold import MarigoldDetector
 
 
 models = {}
@@ -44,6 +45,7 @@ config = {
     'Midas Depth Hybrid': {'class': MidasDetector, 'checkpoint': True, 'params': {'bg_th': 0.1, 'depth_and_normal': False}},
     'Leres Depth': {'class': LeresDetector, 'checkpoint': True, 'params': {'boost': False, 'thr_a':0, 'thr_b':0}},
     'Zoe Depth': {'class': ZoeDetector, 'checkpoint': True, 'params': {'gamma_corrected': False}, 'load_config': {'pretrained_model_or_path': 'halffried/gyre_zoedepth', 'filename': 'ZoeD_M12_N.safetensors', 'model_type': "zoedepth"}},
+    'Marigold Depth': {'class': MarigoldDetector, 'checkpoint': True, 'params': {'denoising_steps': 10, 'ensemble_size': 10, 'processing_res': 512, 'match_input_res': True, 'color_map': 'None'}, 'load_config': {'pretrained_model_or_path': 'Bingxin/Marigold'}},
     'Normal Bae': {'class': NormalBaeDetector, 'checkpoint': True, 'params': {}},
     # segmentation models
     'SegmentAnything': {'class': SamDetector, 'checkpoint': True, 'model': 'Base', 'params': {}},
@@ -106,6 +108,9 @@ def update_settings(*settings):
     update(['Edge', 'params', 'pf'], settings[21])
     update(['Edge', 'params', 'mode'], settings[22])
     update(['Zoe Depth', 'params', 'gamma_corrected'], settings[23])
+    update(['Marigold Depth', 'params', 'color_map'], settings[24])
+    update(['Marigold Depth', 'params', 'denoising_steps'], settings[25])
+    update(['Marigold Depth', 'params', 'ensemble_size'], settings[26])
 
 
 class Processor():
@@ -184,7 +189,7 @@ class Processor():
             display(e, 'Control processor load')
             return f'Processor load filed: {processor_id}'
 
-    def __call__(self, image_input: Image):
+    def __call__(self, image_input: Image, mode: str = 'RGB'):
         if self.override is not None:
             image_input = self.override
         image_process = image_input
@@ -203,19 +208,20 @@ class Processor():
             t0 = time.time()
             kwargs = config.get(self.processor_id, {}).get('params', None)
             if self.resize:
-                orig_size = image_input.size
                 image_resized = image_input.resize((512, 512))
             else:
                 image_resized = image_input
-            with torch.no_grad():
+            with devices.inference_context():
                 image_process = self.model(image_resized, **kwargs)
-            if self.resize:
-                image_process = image_process.resize(orig_size, Image.Resampling.LANCZOS)
+            if self.resize and image_process.size != image_input.size:
+                image_process = image_process.resize(image_input.size, Image.Resampling.LANCZOS)
             t1 = time.time()
-            log.debug(f'Control processor: id="{self.processor_id}" args={kwargs} time={t1-t0:.2f}')
+            log.debug(f'Control processor: id="{self.processor_id}" mode={mode} args={kwargs} time={t1-t0:.2f}')
         except Exception as e:
             log.error(f'Control processor failed: id="{self.processor_id}" error={e}')
             display(e, 'Control processor')
+        if mode != 'RGB':
+            image_process = image_process.convert(mode)
         return image_process
 
     def preview(self, image_input: Image):

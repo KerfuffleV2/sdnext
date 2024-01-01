@@ -111,6 +111,7 @@ def parse_style(styles):
 
 
 def process_interrogate(interrogation_function, mode, ii_input_files, ii_input_dir, ii_output_dir, *ii_singles):
+    mode = int(mode)
     if mode in {0, 1, 3, 4}:
         return [interrogation_function(ii_singles[mode]), None]
     if mode == 2:
@@ -182,10 +183,10 @@ def create_advanced_inputs(tab):
     with gr.Accordion(open=False, label="Advanced", elem_id=f"{tab}_advanced", elem_classes=["small-accordion"]):
         with gr.Group():
             with FormRow():
-                cfg_scale = gr.Slider(minimum=0.0, maximum=30.0, step=0.1, label='CFG scale', value=4.0, elem_id=f"{tab}_cfg_scale")
+                cfg_scale = gr.Slider(minimum=0.0, maximum=30.0, step=0.1, label='CFG scale', value=6.0, elem_id=f"{tab}_cfg_scale")
                 clip_skip = gr.Slider(label='CLIP skip', value=1, minimum=1, maximum=14, step=1, elem_id=f"{tab}_clip_skip", interactive=True)
             with FormRow():
-                image_cfg_scale = gr.Slider(minimum=0.0, maximum=30.0, step=0.1, label='Secondary CFG scale', value=4.0, elem_id=f"{tab}_image_cfg_scale")
+                image_cfg_scale = gr.Slider(minimum=0.0, maximum=30.0, step=0.1, label='Secondary CFG scale', value=6.0, elem_id=f"{tab}_image_cfg_scale")
                 diffusers_guidance_rescale = gr.Slider(minimum=0.0, maximum=1.0, step=0.05, label='Guidance rescale', value=0.7, elem_id=f"{tab}_image_cfg_rescale", visible=shared.backend == shared.Backend.DIFFUSERS)
         with gr.Group():
             with FormRow():

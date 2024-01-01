@@ -143,6 +143,8 @@ def process_diffusers(p: StableDiffusionProcessing):
     def task_specific_kwargs(model):
         task_args = {}
         is_img2img_model = bool('Zero123' in shared.sd_model.__class__.__name__)
+        if len(getattr(p, 'init_images' ,[])) > 0:
+            p.init_images = [p.convert('RGB') for p in p.init_images]
         if sd_models.get_diffusers_task(model) == sd_models.DiffusersTaskType.TEXT_2_IMAGE and not is_img2img_model:
             p.ops.append('txt2img')
             if hasattr(p, 'width') and hasattr(p, 'height'):
@@ -221,14 +223,14 @@ def process_diffusers(p: StableDiffusionProcessing):
         if 'prompt' in possible:
             if hasattr(model, 'text_encoder') and 'prompt_embeds' in possible and len(p.prompt_embeds) > 0 and p.prompt_embeds[0] is not None:
                 args['prompt_embeds'] = p.prompt_embeds[0]
-                if 'XL' in model.__class__.__name__:
-                    args['pooled_prompt_embeds'] = p.positive_pooleds[0]
+                if 'XL' in model.__class__.__name__ and len(getattr(p, 'negative_pooleds', [])) > 0:
+                    args['pooled_prompt_embeds'] = p.negative_pooleds[0]
             else:
                 args['prompt'] = prompts
         if 'negative_prompt' in possible:
             if hasattr(model, 'text_encoder') and 'negative_prompt_embeds' in possible and len(p.negative_embeds) > 0 and p.negative_embeds[0] is not None:
                 args['negative_prompt_embeds'] = p.negative_embeds[0]
-                if 'XL' in model.__class__.__name__:
+                if 'XL' in model.__class__.__name__ and len(getattr(p, 'negative_pooleds', [])) > 0:
                     args['negative_pooled_prompt_embeds'] = p.negative_pooleds[0]
             else:
                 args['negative_prompt'] = negative_prompts
@@ -354,7 +356,6 @@ def process_diffusers(p: StableDiffusionProcessing):
 
     def update_sampler(sd_model, second_pass=False):
         sampler_selection = p.latent_sampler if second_pass else p.sampler_name
-        # is_karras_compatible = sd_model.__class__.__init__.__annotations__.get("scheduler", None) == diffusers.schedulers.scheduling_utils.KarrasDiffusionSchedulers
         if sd_model.__class__.__name__ in ['AmusedPipeline']:
             return # models with their own schedulers
         if hasattr(sd_model, 'scheduler') and sampler_selection != 'Default':

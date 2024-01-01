@@ -15,7 +15,7 @@ from modules.control.units import lite # Kohya ControlLLLite
 from modules.control.units import t2iadapter # TencentARC T2I-Adapter
 from modules.control.units import reference # ControlNet-Reference
 from modules.control.units import ipadapter # IP-Adapter
-from modules import devices, shared, errors, processing, images, sd_models, sd_samplers
+from modules import devices, shared, errors, processing, images, sd_models
 
 
 debug = shared.log.trace if os.environ.get('SD_CONTROL_DEBUG', None) is not None else lambda *args, **kwargs: None
@@ -90,8 +90,8 @@ def control_run(units: List[unit.Unit], inputs, inits, unit_type: str, is_genera
         negative_prompt = negative,
         styles = styles,
         steps = steps,
-        sampler_name = sd_samplers.samplers[sampler_index].name,
-        latent_sampler = sd_samplers.samplers[sampler_index].name,
+        sampler_name = processing.get_sampler_name(sampler_index),
+        latent_sampler = processing.get_sampler_name(sampler_index),
         seed = seed,
         subseed = subseed,
         subseed_strength = subseed_strength,
@@ -120,6 +120,8 @@ def control_run(units: List[unit.Unit], inputs, inits, unit_type: str, is_genera
         denoising_strength = denoising_strength,
         n_iter = batch_count,
         batch_size = batch_size,
+        outpath_samples=shared.opts.outdir_samples or shared.opts.outdir_control_samples,
+        outpath_grids=shared.opts.outdir_grids or shared.opts.outdir_control_grids,
     )
     processing.process_init(p)
 
@@ -261,6 +263,8 @@ def control_run(units: List[unit.Unit], inputs, inits, unit_type: str, is_genera
         shared.sd_model = pipe
         if not ((shared.opts.diffusers_model_cpu_offload or shared.cmd_opts.medvram) or (shared.opts.diffusers_seq_cpu_offload or shared.cmd_opts.lowvram)):
             shared.sd_model.to(shared.device)
+        shared.sd_model.to(device=devices.device, dtype=devices.dtype)
+        debug(f'Control device={devices.device} dtype={devices.dtype}')
         sd_models.copy_diffuser_options(shared.sd_model, original_pipeline) # copy options from original pipeline
         sd_models.set_diffuser_options(shared.sd_model)
         if ipadapter.apply_ip_adapter(shared.sd_model, p, ip_adapter, ip_scale, ip_image, reset=True):
@@ -340,6 +344,10 @@ def control_run(units: List[unit.Unit], inputs, inits, unit_type: str, is_genera
                     if p.resize_mode != 0 and input_image is not None and resize_time == 'Before':
                         debug(f'Control resize: image={input_image} width={width} height={height} mode={p.resize_mode} name={resize_name} sequence={resize_time}')
                         input_image = images.resize_image(p.resize_mode, input_image, width, height, resize_name)
+                    if input_image is not None:
+                        p.width = input_image.width
+                        p.height = input_image.height
+                        debug(f'Control: input image={input_image}')
 
                     # process
                     if input_image is None:
@@ -357,7 +365,8 @@ def control_run(units: List[unit.Unit], inputs, inits, unit_type: str, is_genera
                             return msg
                         processed_image = p.ref_image
                     elif len(active_process) == 1:
-                        p.image = active_process[0](input_image)
+                        image_mode = 'L' if unit_type == 'adapter' and len(active_model) > 0 and ('Canny' in active_model[0].model_id or 'Sketch' in active_model[0].model_id) else 'RGB'
+                        p.image = active_process[0](input_image, image_mode)
                         p.task_args['image'] = p.image
                         p.extra_generation_params["Control process"] = active_process[0].processor_id
                         debug(f'Control: process={active_process[0].processor_id} image={p.image}')
@@ -369,7 +378,10 @@ def control_run(units: List[unit.Unit], inputs, inits, unit_type: str, is_genera
                         processed_image = p.image
                     else:
                         if len(active_process) > 0:
-                            p.image = [p(input_image) for p in active_process] # list[image]
+                            p.image = []
+                            for i, process in enumerate(active_process): # list[image]
+                                image_mode = 'L' if unit_type == 'adapter' and len(active_model) > i and ('Canny' in active_model[i].model_id or 'Sketch' in active_model[i].model_id) else 'RGB'
+                                p.image.append(process(input_image, image_mode))
                         else:
                             p.image = [input_image]
                         p.task_args['image'] = p.image

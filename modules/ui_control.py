@@ -1,5 +1,6 @@
 import os
 import gradio as gr
+import matplotlib.pyplot
 from modules.control import unit
 from modules.control import processors # patrickvonplaten controlnet_aux
 from modules.control.units import controlnet # lllyasviel ControlNet
@@ -110,7 +111,9 @@ def get_video(filepath: str):
 
 
 def select_input(selected_input, selected_init, init_type):
-    debug(f'Control select input: source={selected_input} init={selected_init}, type={init_type}')
+    if selected_input is None:
+        return [gr.Tabs.update(), '']
+    debug(f'Control select input: source={selected_input} init={selected_init} type={init_type}')
     global input_source, input_init # pylint: disable=global-statement
     input_type = type(selected_input)
     status = 'Control input | Unknown'
@@ -120,6 +123,14 @@ def select_input(selected_input, selected_init, init_type):
         input_source = [selected_input]
         input_type = 'PIL.Image'
         shared.log.debug(f'Control input: type={input_type} input={input_source}')
+        status = f'Control input | Image | Size {selected_input.width}x{selected_input.height} | Mode {selected_input.mode}'
+        res = [gr.Tabs.update(selected='out-gallery'), status]
+    elif isinstance(selected_input, dict): # inpaint
+        mask = selected_input['mask']
+        selected_input = selected_input['image']
+        input_source = [selected_input]
+        input_type = 'PIL.Image'
+        shared.log.debug(f'Control input: type={input_type} input={input_source} mask={mask}')
         status = f'Control input | Image | Size {selected_input.width}x{selected_input.height} | Mode {selected_input.mode}'
         res = [gr.Tabs.update(selected='out-gallery'), status]
     elif isinstance(selected_input, gr.components.image.Image): # not likely
@@ -301,7 +312,7 @@ def create_ui(_blocks: gr.Blocks=None):
                     outputs = [output_tabs, result_txt]
                     if hasattr(ctrl, 'change'):
                         ctrl.change(fn=select_input, inputs=inputs, outputs=outputs)
-                    if hasattr(ctrl, 'select'):
+                    elif hasattr(ctrl, 'select'):
                         ctrl.select(fn=select_input, inputs=inputs, outputs=outputs)
                 show_preview.change(fn=lambda x: gr.update(visible=x), inputs=[show_preview], outputs=[column_preview])
                 show_ip.change(fn=lambda x: gr.update(visible=x), inputs=[show_ip], outputs=[column_ip])
@@ -325,7 +336,7 @@ def create_ui(_blocks: gr.Blocks=None):
                                         enabled_cb = gr.Checkbox(value= i==0, label="")
                                         process_id = gr.Dropdown(label="Processor", choices=processors.list_models(), value='None')
                                         model_id = gr.Dropdown(label="ControlNet", choices=controlnet.list_models(), value='None')
-                                        ui_common.create_refresh_button(model_id, controlnet.list_models, lambda: {"choices": controlnet.list_models(refresh=True)}, 'refresh_control_models')
+                                        ui_common.create_refresh_button(model_id, controlnet.list_models, lambda: {"choices": controlnet.list_models(refresh=True)}, 'refresh_controlnet_models')
                                         model_strength = gr.Slider(label="Strength", minimum=0.01, maximum=1.0, step=0.01, value=1.0-i/10)
                                         control_start = gr.Slider(label="Start", minimum=0.0, maximum=1.0, step=0.05, value=0)
                                         control_end = gr.Slider(label="End", minimum=0.0, maximum=1.0, step=0.05, value=1.0)
@@ -370,7 +381,7 @@ def create_ui(_blocks: gr.Blocks=None):
                                         enabled_cb = gr.Checkbox(value= i==0, label="")
                                         process_id = gr.Dropdown(label="Processor", choices=processors.list_models(), value='None')
                                         model_id = gr.Dropdown(label="ControlNet-XS", choices=xs.list_models(), value='None')
-                                        ui_common.create_refresh_button(model_id, xs.list_models, lambda: {"choices": xs.list_models(refresh=True)}, 'refresh_control_models')
+                                        ui_common.create_refresh_button(model_id, xs.list_models, lambda: {"choices": xs.list_models(refresh=True)}, 'refresh_xs_models')
                                         model_strength = gr.Slider(label="Strength", minimum=0.01, maximum=1.0, step=0.01, value=1.0-i/10)
                                         control_start = gr.Slider(label="Start", minimum=0.0, maximum=1.0, step=0.05, value=0)
                                         control_end = gr.Slider(label="End", minimum=0.0, maximum=1.0, step=0.05, value=1.0)
@@ -558,6 +569,10 @@ def create_ui(_blocks: gr.Blocks=None):
                             settings.append(gr.Radio(label="Mode", choices=['edge', 'gradient'], value='edge'))
                         with gr.Accordion('Zoe Depth', open=True, elem_classes=['processor-settings']):
                             settings.append(gr.Checkbox(label="Gamma corrected", value=False))
+                        with gr.Accordion('Marigold Depth', open=True, elem_classes=['processor-settings']):
+                            settings.append(gr.Dropdown(label="Color map", choices=['None'] + matplotlib.pyplot.colormaps(), value='None'))
+                            settings.append(gr.Slider(label="Denoising steps", minimum=1, maximum=99, step=1, value=10))
+                            settings.append(gr.Slider(label="Ensemble size", minimum=1, maximum=99, step=1, value=10))
                         for setting in settings:
                             setting.change(fn=processors.update_settings, inputs=settings, outputs=[])
 
