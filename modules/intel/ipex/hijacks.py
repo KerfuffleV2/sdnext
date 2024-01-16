@@ -3,7 +3,11 @@ from functools import wraps
 from contextlib import nullcontext
 import torch
 import intel_extension_for_pytorch as ipex # pylint: disable=import-error, unused-import
-from modules import devices
+# from modules import devices
+
+class devices:
+    device = torch.device('xpu')
+    dtype = torch.float16
 
 # pylint: disable=protected-access, missing-function-docstring, line-too-long, unnecessary-lambda, no-else-return
 
@@ -43,7 +47,7 @@ def ipex_autocast(*args, **kwargs):
 original_interpolate = torch.nn.functional.interpolate
 @wraps(torch.nn.functional.interpolate)
 def interpolate(tensor, size=None, scale_factor=None, mode='nearest', align_corners=None, recompute_scale_factor=None, antialias=False): # pylint: disable=too-many-arguments
-    if antialias or align_corners is not None:
+    if antialias or align_corners is not None or mode == 'bicubic':
         return_device = tensor.device
         return_dtype = tensor.dtype
         return original_interpolate(tensor.to("cpu", dtype=torch.float32), size=size, scale_factor=scale_factor, mode=mode,
@@ -72,6 +76,7 @@ else:
     except Exception: # pylint: disable=broad-exception-caught
         original_torch_bmm = torch.bmm
         original_scaled_dot_product_attention = torch.nn.functional.scaled_dot_product_attention
+        raise
 
 
 # Data Type Errors:
